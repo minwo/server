@@ -17,49 +17,61 @@ const connectDB = async () => {
 
 connectDB();
 
-// 'post' 컬렉션에 대한 스키마 정의
 const PostSchema = new mongoose.Schema({
   title: String,
   content: String
 });
 
-// 'post' 컬렉션에 대한 모델 생성
 const Post = mongoose.model('Post', PostSchema, 'post');
 
-// 미들웨어 설정
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:3000', 'https://minwo.github.io/mwtest']
+}));
 app.use(express.json());
 
-// 루트 URL('/')에 대한 GET 요청을 처리하는 라우트 핸들러
 app.get('/', (req, res) => {
   res.send('Hello, World!');
 });
 
-// 'post' 컬렉션의 모든 문서를 가져오는 API 엔드포인트
 app.get('/post', async (req, res) => {
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
   try {
-    const posts = await Post.find({});
-    res.json(posts);
+    const posts = await Post.find().skip(skip).limit(limit);
+    const total = await Post.countDocuments();
+    res.json({ posts, total });
   } catch (err) {
     res.status(500).send(err);
   }
 });
 
-// 'post' 컬렉션에 새로운 문서를 추가하는 API 엔드포인트
+app.put('/post/:id', async (req, res) => {
+  const { id } = req.params;
+  const { title, content } = req.body;
+
+  try {
+      const updatedPost = await Post.findByIdAndUpdate(id, { title, content }, { new: true });
+      res.status(200).json(updatedPost);
+  } catch (err) {
+      res.status(500).send(err);
+  }
+});
+
+// Add POST endpoint
 app.post('/post', async (req, res) => {
+  const { title, content } = req.body;
+
   try {
-    const newPost = new Post({
-      title: req.body.title,
-      content: req.body.content
-    });
-    const savedPost = await newPost.save();
-    res.json(savedPost);
+    const newPost = new Post({ title, content });
+    await newPost.save();
+    res.status(201).json(newPost);
   } catch (err) {
     res.status(500).send(err);
   }
 });
 
-// 서버를 시작하여 특정 포트에서 수신 대기
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
